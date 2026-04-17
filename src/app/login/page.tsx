@@ -37,7 +37,7 @@ function LoginForm() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-white px-8">
-      <img src="/calaboca-svg.svg" alt="Calaboca" className="absolute top-8 left-8 w-36" />
+      <img src="/calaboca-svg.svg" alt="Calaboca" className="absolute top-8 left-8 w-36 invert" />
 
       <div className="w-full max-w-sm">
         <h2 className="text-3xl font-bold text-slate-900 mb-1">Welcome Back!</h2>
