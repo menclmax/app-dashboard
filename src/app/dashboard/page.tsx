@@ -1,20 +1,32 @@
 import { Header } from "@/components/layout/header"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
-import { STATS, MOCK_USERS, MOCK_PLACES } from "@/lib/mock-data"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { getDashboardStats, getOnlineUsers, getPendingVenues, getRecentUsers } from "@/lib/data"
+import { approveVenue, verifyUser } from "@/app/actions/admin"
 import {
-  Users,
-  UserPlus,
-  Wifi,
-  Clock,
-  MapPin,
-  Star,
-  TrendingUp,
-  CheckCircle2,
-  XCircle,
-  Coffee,
+  Users, UserPlus, Wifi, Clock, MapPin, Star,
+  TrendingUp, TrendingDown, CheckCircle2, Coffee,
 } from "lucide-react"
+
+function trend(current: number, previous: number) {
+  if (previous === 0 && current === 0) return null
+  if (previous === 0) return { pct: 100, up: true }
+  const pct = Math.round(((current - previous) / previous) * 100)
+  return { pct: Math.abs(pct), up: pct >= 0 }
+}
+
+function Trend({ current, previous }: { current: number; previous: number }) {
+  const t = trend(current, previous)
+  if (!t) return null
+  const Icon = t.up ? TrendingUp : TrendingDown
+  return (
+    <span className={`inline-flex items-center gap-0.5 text-xs font-medium ${t.up ? "text-emerald-600" : "text-red-500"}`}>
+      <Icon className="h-3.5 w-3.5" />
+      {t.pct}%
+    </span>
+  )
+}
 
 function StatCard({
   title,
@@ -22,12 +34,14 @@ function StatCard({
   subtitle,
   icon: Icon,
   accent = false,
+  trend,
 }: {
   title: string
   value: string | number
   subtitle?: string
   icon: React.ElementType
   accent?: boolean
+  trend?: React.ReactNode
 }) {
   return (
     <Card className={accent ? "border-yellow-200 bg-yellow-50" : ""}>
@@ -35,7 +49,10 @@ function StatCard({
         <div className="flex items-start justify-between">
           <div>
             <p className="text-sm font-medium text-slate-500">{title}</p>
-            <p className={`text-3xl font-bold mt-1 ${accent ? "text-yellow-700" : "text-slate-900"}`}>{value}</p>
+            <div className="flex items-baseline gap-2 mt-1">
+              <p className={`text-3xl font-bold ${accent ? "text-yellow-700" : "text-slate-900"}`}>{value}</p>
+              {trend}
+            </div>
             {subtitle && <p className="text-xs text-slate-400 mt-1">{subtitle}</p>}
           </div>
           <div className={`flex h-10 w-10 items-center justify-center rounded-xl ${accent ? "bg-yellow-400/20" : "bg-slate-100"}`}>
@@ -47,10 +64,22 @@ function StatCard({
   )
 }
 
-export default function OverviewPage() {
-  const onlineUsers = MOCK_USERS.filter((u) => u.isOnline)
-  const pendingPlaces = MOCK_PLACES.filter((p) => p.status === "pending")
-  const recentUsers = MOCK_USERS.slice(0, 5)
+function initials(name: string | null, username: string) {
+  if (name) return name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase()
+  return username.slice(0, 2).toUpperCase()
+}
+
+export default async function OverviewPage() {
+  const [stats, onlineUsers, pendingVenues, recentUsers] = await Promise.all([
+    getDashboardStats(),
+    getOnlineUsers(),
+    getPendingVenues(),
+    getRecentUsers(5),
+  ])
+
+  const monthlyGrowth = stats.signupsLastMonth > 0
+    ? Math.round(((stats.signupsThisMonth - stats.signupsLastMonth) / stats.signupsLastMonth) * 100)
+    : stats.signupsThisMonth > 0 ? 100 : 0
 
   return (
     <main className="flex-1">
@@ -59,17 +88,21 @@ export default function OverviewPage() {
 
         {/* Stats grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <StatCard title="Total Users" value={STATS.totalUsers} subtitle="All time" icon={Users} />
-          <StatCard title="New Today" value={STATS.newSignupsToday} subtitle="Signups in last 24h" icon={UserPlus} accent />
-          <StatCard title="Online Now" value={STATS.onlineNow} subtitle="Active sessions" icon={Wifi} />
-          <StatCard title="Pending Approvals" value={STATS.pendingApprovals} subtitle="Places awaiting review" icon={Clock} />
+          <StatCard title="Total Users" value={stats.totalUsers} subtitle="All time" icon={Users}
+            trend={<Trend current={stats.signupsThisMonth} previous={stats.signupsLastMonth} />} />
+          <StatCard title="New Today" value={stats.newToday} subtitle="Signups in last 24h" icon={UserPlus} accent
+            trend={<Trend current={stats.newToday} previous={stats.newYesterday} />} />
+          <StatCard title="Online Now" value={stats.onlineNow} subtitle="Active in last 15 min" icon={Wifi} />
+          <StatCard title="Pending Approvals" value={stats.pendingApprovals} subtitle="Venues awaiting review" icon={Clock} />
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <StatCard title="Total Places" value={STATS.totalPlaces} subtitle="Submitted spots" icon={MapPin} />
-          <StatCard title="Approved Places" value={STATS.approvedPlaces} subtitle="Live on the app" icon={CheckCircle2} />
-          <StatCard title="Total Reviews" value={STATS.totalReviews} subtitle="Community reviews" icon={Star} />
-          <StatCard title="Monthly Growth" value={`+${STATS.monthlyGrowth}%`} subtitle="New users vs last month" icon={TrendingUp} />
+          <StatCard title="Total Venues" value={stats.totalVenues} subtitle="Submitted spots" icon={MapPin}
+            trend={<Trend current={stats.venuesThisMonth} previous={stats.venuesLastMonth} />} />
+          <StatCard title="Approved Venues" value={stats.approvedVenues} subtitle="Live on the app" icon={CheckCircle2} />
+          <StatCard title="Total Reviews" value={stats.totalReviews} subtitle="Community reviews" icon={Star}
+            trend={<Trend current={stats.reviewsThisMonth} previous={stats.reviewsLastMonth} />} />
+          <StatCard title="Monthly Growth" value={`${monthlyGrowth > 0 ? "+" : ""}${monthlyGrowth}%`} subtitle="New users vs last month" icon={TrendingUp} />
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -81,26 +114,28 @@ export default function OverviewPage() {
                 <CardTitle className="text-base text-slate-800">Online Now</CardTitle>
                 <Badge variant="online" className="gap-1.5">
                   <span className="h-1.5 w-1.5 rounded-full bg-white animate-pulse" />
-                  {STATS.onlineNow} active
+                  {stats.onlineNow} active
                 </Badge>
               </div>
             </CardHeader>
             <CardContent className="space-y-3">
+              {onlineUsers.length === 0 && (
+                <p className="text-sm text-slate-400 py-4 text-center">No users online right now</p>
+              )}
               {onlineUsers.map((user) => (
                 <div key={user.id} className="flex items-center gap-3">
                   <div className="relative">
                     <Avatar className="h-8 w-8">
-                      <AvatarFallback className="text-xs">{user.name.split(" ").map((n) => n[0]).join("")}</AvatarFallback>
+                      <AvatarImage src={user.avatar_url ?? undefined} />
+                      <AvatarFallback className="text-xs">{initials(user.name, user.username)}</AvatarFallback>
                     </Avatar>
                     <span className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-emerald-500 ring-2 ring-white" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-slate-800 truncate">{user.name}</p>
-                    <p className="text-xs text-slate-400 truncate">{user.email}</p>
+                    <p className="text-sm font-medium text-slate-800 truncate">{user.name ?? user.username}</p>
+                    <p className="text-xs text-slate-400 truncate">@{user.username}</p>
                   </div>
-                  <Badge variant={user.plan === "premium" ? "default" : user.plan === "pro" ? "secondary" : "outline"} className="text-[10px]">
-                    {user.plan}
-                  </Badge>
+                  <Badge variant="outline" className="text-[10px]">Lv {user.level}</Badge>
                 </div>
               ))}
             </CardContent>
@@ -111,27 +146,29 @@ export default function OverviewPage() {
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between">
                 <CardTitle className="text-base text-slate-800">Pending Approvals</CardTitle>
-                <Badge variant="warning">{pendingPlaces.length} waiting</Badge>
+                <Badge variant="warning">{stats.pendingApprovals} waiting</Badge>
               </div>
             </CardHeader>
             <CardContent className="space-y-3">
-              {pendingPlaces.map((place) => (
-                <div key={place.id} className="flex items-start gap-3 p-3 rounded-lg bg-slate-50 border border-slate-100">
+              {pendingVenues.length === 0 && (
+                <p className="text-sm text-slate-400 py-4 text-center">No pending venues</p>
+              )}
+              {pendingVenues.map((venue) => (
+                <div key={venue.id} className="flex items-start gap-3 p-3 rounded-lg bg-slate-50 border border-slate-100">
                   <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-yellow-100 shrink-0">
                     <Coffee className="h-4 w-4 text-yellow-700" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-slate-800 truncate">{place.name}</p>
-                    <p className="text-xs text-slate-500 truncate">{place.city} · by {place.submittedBy}</p>
+                    <p className="text-sm font-semibold text-slate-800 truncate">{venue.name}</p>
+                    <p className="text-xs text-slate-500 truncate">
+                      {venue.address ?? "No address"} · by {venue.submitted_by_name ?? venue.submitted_by_username ?? "unknown"}
+                    </p>
                   </div>
-                  <div className="flex gap-1.5 shrink-0">
-                    <button className="flex h-7 w-7 items-center justify-center rounded-md bg-emerald-50 text-emerald-600 hover:bg-emerald-100 transition-colors">
+                  <form action={approveVenue.bind(null, venue.id)}>
+                    <button type="submit" className="flex h-7 w-7 items-center justify-center rounded-md bg-emerald-50 text-emerald-600 hover:bg-emerald-100 transition-colors" title="Approve">
                       <CheckCircle2 className="h-4 w-4" />
                     </button>
-                    <button className="flex h-7 w-7 items-center justify-center rounded-md bg-red-50 text-red-500 hover:bg-red-100 transition-colors">
-                      <XCircle className="h-4 w-4" />
-                    </button>
-                  </div>
+                  </form>
                 </div>
               ))}
             </CardContent>
@@ -150,10 +187,10 @@ export default function OverviewPage() {
                 <thead>
                   <tr className="border-b border-slate-100">
                     <th className="text-left py-2 px-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">User</th>
-                    <th className="text-left py-2 px-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Plan</th>
-                    <th className="text-left py-2 px-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Status</th>
+                    <th className="text-left py-2 px-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Level</th>
+                    <th className="text-left py-2 px-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">XP</th>
+                    <th className="text-left py-2 px-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Verified</th>
                     <th className="text-left py-2 px-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Joined</th>
-                    <th className="text-left py-2 px-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Spots</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50">
@@ -162,26 +199,25 @@ export default function OverviewPage() {
                       <td className="py-3 px-3">
                         <div className="flex items-center gap-2.5">
                           <Avatar className="h-7 w-7">
-                            <AvatarFallback className="text-[10px]">{user.name.split(" ").map((n) => n[0]).join("")}</AvatarFallback>
+                            <AvatarImage src={user.avatar_url ?? undefined} />
+                            <AvatarFallback className="text-[10px]">{initials(user.name, user.username)}</AvatarFallback>
                           </Avatar>
                           <div>
-                            <p className="font-medium text-slate-800">{user.name}</p>
-                            <p className="text-xs text-slate-400">{user.email}</p>
+                            <p className="font-medium text-slate-800">{user.name ?? user.username}</p>
+                            <p className="text-xs text-slate-400">@{user.username}</p>
                           </div>
                         </div>
                       </td>
+                      <td className="py-3 px-3 text-slate-700 font-medium">{user.level}</td>
+                      <td className="py-3 px-3 text-slate-700 font-medium">{user.xp}</td>
                       <td className="py-3 px-3">
-                        <Badge variant={user.plan === "premium" ? "default" : user.plan === "pro" ? "secondary" : "outline"} className="text-[10px]">
-                          {user.plan}
-                        </Badge>
+                        {user.verified
+                          ? <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                          : <span className="text-xs text-slate-300">—</span>}
                       </td>
-                      <td className="py-3 px-3">
-                        <Badge variant={user.status === "active" ? "success" : user.status === "suspended" ? "warning" : "destructive"} className="text-[10px]">
-                          {user.status}
-                        </Badge>
+                      <td className="py-3 px-3 text-slate-500 text-xs">
+                        {user.created_at ? new Date(user.created_at).toLocaleDateString() : "—"}
                       </td>
-                      <td className="py-3 px-3 text-slate-500 text-xs">{user.joinedAt}</td>
-                      <td className="py-3 px-3 text-slate-700 font-medium">{user.spotsAdded}</td>
                     </tr>
                   ))}
                 </tbody>
