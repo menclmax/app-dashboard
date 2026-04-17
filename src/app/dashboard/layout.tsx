@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic'
 import { Sidebar } from "@/components/layout/sidebar"
 import { UserProvider } from "@/components/layout/user-context"
 import { createServerClient, createServiceClient } from "@/lib/supabase"
