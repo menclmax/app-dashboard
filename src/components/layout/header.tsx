@@ -25,12 +25,15 @@ export type HeaderUser = {
   username: string
   email: string
   avatar_url: string | null
+  verified?: boolean
   is_admin?: boolean
+  xp?: number
   level?: number
   bio?: string | null
   location?: string | null
   website?: string | null
   pronouns?: string | null
+  location_sharing?: boolean
 }
 
 function getInitials(name: string | null, username: string) {
@@ -56,7 +59,7 @@ export function Header({ title, description }: HeaderProps) {
 
   async function handleSave(formData: FormData) {
     setSaving(true)
-    await updateProfile(formData)
+    await updateProfile(undefined, formData)
     setSaving(false)
     setSaved(true)
     setTimeout(() => { setSaved(false); setProfileOpen(false) }, 1000)

@@ -1,5 +1,5 @@
 'use client'
-import { useActionState } from 'react'
+import { useActionState, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { login } from '@/app/actions/auth'
 import { supabaseBrowser } from '@/lib/supabase-browser'
@@ -7,9 +7,24 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { AlertCircle } from 'lucide-react'
 
-export default function LoginPage() {
-  const [state, action, pending] = useActionState(login, undefined)
+function UrlError() {
   const searchParams = useSearchParams()
+  const error = searchParams.get('error') === 'google_failed'
+    ? 'Google sign-in failed. Please try again.'
+    : searchParams.get('error') === 'not_admin'
+    ? 'Access denied. Admin privileges required.'
+    : null
+  if (!error) return null
+  return (
+    <div className="flex items-center gap-2 rounded-md bg-red-50 border border-red-100 px-3 py-2 text-sm text-red-600">
+      <AlertCircle className="h-4 w-4 shrink-0" />
+      {error}
+    </div>
+  )
+}
+
+function LoginForm() {
+  const [state, action, pending] = useActionState(login, undefined)
 
   async function handleGoogleLogin() {
     await supabaseBrowser.auth.signInWithOAuth({
@@ -19,14 +34,6 @@ export default function LoginPage() {
       },
     })
   }
-
-  const urlError = searchParams.get('error') === 'google_failed'
-    ? 'Google sign-in failed. Please try again.'
-    : searchParams.get('error') === 'not_admin'
-    ? 'Access denied. Admin privileges required.'
-    : null
-
-  const error = state?.error ?? urlError
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-white px-8">
@@ -59,12 +66,16 @@ export default function LoginPage() {
             className="h-11"
           />
 
-          {error && (
+          {state?.error && (
             <div className="flex items-center gap-2 rounded-md bg-red-50 border border-red-100 px-3 py-2 text-sm text-red-600">
               <AlertCircle className="h-4 w-4 shrink-0" />
-              {error}
+              {state.error}
             </div>
           )}
+
+          <Suspense fallback={null}>
+            <UrlError />
+          </Suspense>
 
           <Button
             type="submit"
@@ -101,4 +112,8 @@ export default function LoginPage() {
       </div>
     </div>
   )
+}
+
+export default function LoginPage() {
+  return <LoginForm />
 }

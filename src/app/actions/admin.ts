@@ -2,7 +2,7 @@
 import { createServiceClient } from '@/lib/supabase'
 import { createServerClient } from '@/lib/supabase'
 
-export async function updateProfile(formData: FormData) {
+export async function updateProfile(_state: { error: string } | null | undefined, formData: FormData) {
   const supabase = await createServerClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Not authenticated' }
@@ -66,16 +66,12 @@ export async function removeUser(userId: string) {
   return null
 }
 
-export async function approveVenue(venueId: string) {
+export async function approveVenue(venueId: string): Promise<void> {
   const sb = createServiceClient()
-  const { error } = await sb.from('venues').update({ is_approved: true }).eq('id', venueId)
-  if (error) return { error: error.message }
-  return null
+  await sb.from('venues').update({ is_approved: true }).eq('id', venueId)
 }
 
-export async function unapproveVenue(venueId: string) {
+export async function unapproveVenue(venueId: string): Promise<void> {
   const sb = createServiceClient()
-  const { error } = await sb.from('venues').update({ is_approved: false }).eq('id', venueId)
-  if (error) return { error: error.message }
-  return null
+  await sb.from('venues').update({ is_approved: false }).eq('id', venueId)
 }
