@@ -3,6 +3,41 @@
 import { createServiceClient } from '@/lib/supabase'
 import { revalidatePath } from 'next/cache'
 
+async function mirrorPhotosToStorage(
+  sb: ReturnType<typeof createServiceClient>,
+  venueId: string,
+  photos: string[]
+): Promise<string[]> {
+  const storageHost = new URL(process.env.NEXT_PUBLIC_SUPABASE_URL!).host
+  const result: string[] = []
+
+  for (let i = 0; i < photos.length; i++) {
+    const url = photos[i]
+    if (url.includes(storageHost)) {
+      result.push(url)
+      continue
+    }
+    try {
+      const res = await fetch(url)
+      if (!res.ok) { result.push(url); continue }
+      const contentType = res.headers.get('content-type') ?? 'image/jpeg'
+      const ext = contentType.split('/')[1]?.split(';')[0] ?? 'jpg'
+      const buffer = new Uint8Array(await res.arrayBuffer())
+      const path = `${venueId}/selected-${i}.${ext}`
+      const { error } = await sb.storage
+        .from('venue-photos')
+        .upload(path, buffer, { contentType, upsert: true })
+      if (error) { result.push(url); continue }
+      const { data } = sb.storage.from('venue-photos').getPublicUrl(path)
+      result.push(data.publicUrl)
+    } catch {
+      result.push(url)
+    }
+  }
+
+  return result
+}
+
 export async function createVenue(
   formData: FormData
 ): Promise<{ id: string } | { error: string }> {
@@ -50,8 +85,15 @@ export async function createVenue(
 
   if (error) return { error: error.message }
 
+  const venueId = data.id
+
+  if (selected_photos && selected_photos.length > 0) {
+    const mirrored = await mirrorPhotosToStorage(sb, venueId, selected_photos)
+    await sb.from('venues').update({ selected_photos: mirrored }).eq('id', venueId)
+  }
+
   revalidatePath('/dashboard/places')
-  return { id: data.id }
+  return { id: venueId }
 }
 
 export async function updateVenue(
@@ -73,7 +115,10 @@ export async function updateVenue(
   const google_photos = googlePhotosRaw ? JSON.parse(googlePhotosRaw) : null
 
   const selectedPhotosRaw = formData.get('selected_photos') as string | null
-  const selected_photos = selectedPhotosRaw ? JSON.parse(selectedPhotosRaw) : null
+  const selected_photos_raw: string[] | null = selectedPhotosRaw ? JSON.parse(selectedPhotosRaw) : null
+  const selected_photos = selected_photos_raw && selected_photos_raw.length > 0
+    ? await mirrorPhotosToStorage(sb, venueId, selected_photos_raw)
+    : selected_photos_raw
 
   const sectionApprovalsRaw = formData.get('section_approvals') as string | null
   const section_approvals = sectionApprovalsRaw ? JSON.parse(sectionApprovalsRaw) : {}

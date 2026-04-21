@@ -416,7 +416,7 @@ export function VenueForm({ venue, mode, onSuccess, onCancel }: VenueFormProps) 
       {/* Status */}
       <Card>
         <CardContent className="pt-6 space-y-4">
-          <SectionHeader label="Status" section="status" venueId={venueId} approvals={sectionApprovals} onToggle={handleSectionToggle} />
+          <h2 className="text-sm font-semibold text-slate-700 uppercase tracking-wide -mt-1">Status</h2>
           <label className="flex items-center gap-2.5 cursor-pointer select-none">
             <input type="checkbox" name="is_approved" defaultChecked={!!venue?.is_approved} className="h-4 w-4 rounded border-slate-300 accent-slate-800" />
             <span className="text-sm text-slate-700">Approved</span>

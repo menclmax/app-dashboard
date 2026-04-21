@@ -308,7 +308,7 @@ export function PlacesClient({ venues }: { venues: Venue[] }) {
                           <tr
                             key={venue.id}
                             ref={(el) => { if (el) rowRefs.current.set(venue.id, el) }}
-                            onClick={() => setActiveId(venue.id === activeId ? null : venue.id)}
+                            onClick={() => { setActiveId(venue.id); openEdit(venue) }}
                             className={`transition-colors cursor-pointer ${
                               isPanelVenue
                                 ? "bg-indigo-50 ring-1 ring-inset ring-indigo-200"
@@ -437,7 +437,7 @@ export function PlacesClient({ venues }: { venues: Venue[] }) {
                   <div
                     key={venue.id}
                     ref={(el) => { if (el) rowRefs.current.set(venue.id, el) }}
-                    onClick={() => setActiveId(venue.id === activeId ? null : venue.id)}
+                    onClick={() => { setActiveId(venue.id); openEdit(venue) }}
                     className={`rounded-xl border bg-white overflow-hidden cursor-pointer transition-all hover:shadow-md ${
                       isPanelVenue
                         ? "ring-2 ring-indigo-400 shadow-indigo-100 shadow-md"
