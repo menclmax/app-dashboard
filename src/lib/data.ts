@@ -14,10 +14,23 @@ export type Profile = {
   is_admin: boolean
 }
 
+export type DayHours = { open: string; close: string; closed: boolean }
+export type OpeningHours = Record<string, DayHours>
+
+export type SectionApproval = {
+  approved_by: string
+  approved_at: string
+  approver_name: string | null
+  approver_avatar: string | null
+}
+export type SectionApprovals = Partial<Record<string, SectionApproval>>
+
 export type Venue = {
   id: string
   name: string
   address: string | null
+  lat: number
+  lng: number
   created_at: string | null
   is_approved: boolean
   is_user_submitted: boolean
@@ -27,6 +40,21 @@ export type Venue = {
   submitted_by: string | null
   submitted_by_name: string | null
   submitted_by_username: string | null
+  cover_photo_url: string | null
+  photo_url: string | null
+  logo_url: string | null
+  cover_color: string | null
+  price_range: number | null
+  wifi: boolean | null
+  outlets: boolean | null
+  pet_friendly: boolean | null
+  vegan: boolean | null
+  open_now: boolean | null
+  google_place_id: string | null
+  opening_hours: OpeningHours | null
+  google_photos: string[] | null
+  selected_photos: string[] | null
+  section_approvals: SectionApprovals
 }
 
 export type DashboardStats = {
@@ -136,6 +164,20 @@ export async function getOnlineUsers(): Promise<Profile[]> {
   return data ?? []
 }
 
+export async function getRecentlyOfflineUsers(limit = 30): Promise<Profile[]> {
+  const sb = createServiceClient()
+  const onlineThreshold = new Date(Date.now() - 15 * 60 * 1000).toISOString()
+  const recentThreshold = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
+  const { data } = await sb
+    .from('profiles')
+    .select('id, username, name, avatar_url, verified, last_seen, created_at, xp, level, is_admin')
+    .lt('last_seen', onlineThreshold)
+    .gte('last_seen', recentThreshold)
+    .order('last_seen', { ascending: false })
+    .limit(limit)
+  return data ?? []
+}
+
 export async function getPendingVenues(limit = 5): Promise<Venue[]> {
   const sb = createServiceClient()
   const { data } = await sb
@@ -166,7 +208,7 @@ export async function getAllVenues(): Promise<Venue[]> {
   const sb = createServiceClient()
   const { data } = await sb
     .from('venues')
-    .select('id, name, address, created_at, is_approved, is_user_submitted, tags, rating, review_count, submitted_by, profiles(name, username)')
+    .select('id, name, address, lat, lng, created_at, is_approved, is_user_submitted, tags, rating, review_count, submitted_by, cover_photo_url, photo_url, logo_url, cover_color, price_range, wifi, outlets, pet_friendly, vegan, open_now, google_place_id, opening_hours, google_photos, selected_photos, section_approvals, profiles(name, username)')
     .order('created_at', { ascending: false })
   return (data ?? []).map((v: any) => ({
     ...v,
@@ -174,4 +216,19 @@ export async function getAllVenues(): Promise<Venue[]> {
     submitted_by_username: v.profiles?.username ?? null,
     profiles: undefined,
   }))
+}
+
+export async function getVenueById(id: string): Promise<Venue | null> {
+  const sb = createServiceClient()
+  const { data } = await sb
+    .from('venues')
+    .select('id, name, address, lat, lng, created_at, is_approved, is_user_submitted, tags, rating, review_count, submitted_by, cover_photo_url, photo_url, logo_url, cover_color, price_range, wifi, outlets, pet_friendly, vegan, open_now, google_place_id, opening_hours, google_photos, selected_photos, section_approvals, profiles(name, username)')
+    .eq('id', id)
+    .single()
+  if (!data) return null
+  return {
+    ...data,
+    submitted_by_name: (data as any).profiles?.name ?? null,
+    submitted_by_username: (data as any).profiles?.username ?? null,
+  }
 }

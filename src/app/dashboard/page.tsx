@@ -82,7 +82,7 @@ export default async function OverviewPage() {
     : stats.signupsThisMonth > 0 ? 100 : 0
 
   return (
-    <main className="flex-1">
+    <main className="flex-1 overflow-y-auto">
       <Header title="Overview" description="Welcome back — here's what's happening at Calaboca" />
       <div className="p-6 space-y-6">
 

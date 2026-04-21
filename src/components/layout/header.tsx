@@ -1,11 +1,12 @@
 "use client"
 
-import { Bell, Search, LogOut, User, Settings, Shield } from "lucide-react"
+import { Bell, Search, LogOut, User, Settings, Shield, ChevronRight } from "lucide-react"
+import { Fragment } from "react"
 import { Input } from "@/components/ui/input"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
-  DropdownMenuSeparator, DropdownMenuTrigger,
+  DropdownMenuSeparator, DropdownMenuTrigger, DropdownMenuLabel,
 } from "@/components/ui/dropdown-menu"
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
@@ -13,9 +14,10 @@ import {
 import { Label } from "@/components/ui/label"
 import { Input as ShadInput } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import { updateProfile } from "@/app/actions/admin"
+import { getNotifications, type AppNotification } from "@/app/actions/notifications"
 import { supabaseBrowser } from "@/lib/supabase-browser"
 import { logout } from "@/app/actions/auth"
 import { useUser } from "./user-context"
@@ -44,13 +46,19 @@ function getInitials(name: string | null, username: string) {
 interface HeaderProps {
   title: string
   description?: string
+  breadcrumb?: { label: string; href: string }[]
 }
 
-export function Header({ title, description }: HeaderProps) {
+export function Header({ title, description, breadcrumb }: HeaderProps) {
   const user = useUser()
   const [profileOpen, setProfileOpen] = useState(false)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
+  const [notifications, setNotifications] = useState<AppNotification[]>([])
+
+  useEffect(() => {
+    getNotifications().then(setNotifications)
+  }, [])
 
   async function handleLogout() {
     await supabaseBrowser.auth.signOut()
@@ -69,8 +77,24 @@ export function Header({ title, description }: HeaderProps) {
     <>
       <header className="sticky top-0 z-30 flex h-16 items-center justify-between gap-4 border-b border-slate-200 bg-white/80 backdrop-blur-md px-6">
         <div>
-          <h1 className="text-lg font-semibold text-slate-900 leading-tight">{title}</h1>
-          {description && <p className="text-xs text-slate-500">{description}</p>}
+          {breadcrumb ? (
+            <nav className="flex items-center gap-1.5 text-sm">
+              {breadcrumb.map((crumb, i) => (
+                <Fragment key={crumb.href}>
+                  {i > 0 && <ChevronRight className="h-3.5 w-3.5 text-slate-400" />}
+                  {i === breadcrumb.length - 1
+                    ? <span className="font-semibold text-slate-900">{crumb.label}</span>
+                    : <Link href={crumb.href} className="text-slate-500 hover:text-slate-700">{crumb.label}</Link>
+                  }
+                </Fragment>
+              ))}
+            </nav>
+          ) : (
+            <>
+              <h1 className="text-lg font-semibold text-slate-900 leading-tight">{title}</h1>
+              {description && <p className="text-xs text-slate-500">{description}</p>}
+            </>
+          )}
         </div>
 
         <div className="flex items-center gap-3">
@@ -79,12 +103,50 @@ export function Header({ title, description }: HeaderProps) {
             <Input placeholder="Search..." className="pl-8 w-56 h-8 text-sm" />
           </div>
 
-          <button className="relative flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 transition-colors">
-            <Bell className="h-4 w-4" />
-            <span className="absolute -top-0.5 -right-0.5 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-yellow-400 text-[8px] font-bold text-yellow-900">
-              4
-            </span>
-          </button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button className="relative flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 transition-colors focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:ring-offset-2">
+                <Bell className="h-4 w-4" />
+                {notifications.length > 0 && (
+                  <span className="absolute -top-0.5 -right-0.5 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-yellow-400 text-[8px] font-bold text-yellow-900">
+                    {notifications.length > 9 ? '9+' : notifications.length}
+                  </span>
+                )}
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" sideOffset={8} className="w-80">
+              <DropdownMenuLabel className="flex items-center justify-between px-3 py-2">
+                <span className="font-semibold text-slate-900">Notifications</span>
+                {notifications.length > 0 && (
+                  <span className="text-xs text-slate-400 font-normal">{notifications.length} recent</span>
+                )}
+              </DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              {notifications.length === 0 ? (
+                <div className="px-3 py-6 text-center text-xs text-slate-400">No new notifications</div>
+              ) : notifications.map((n) => (
+                <DropdownMenuItem key={n.id} asChild>
+                  <Link
+                    href={n.href ?? '#'}
+                    className="flex flex-col items-start gap-0.5 px-3 py-2.5 cursor-pointer focus:bg-slate-50"
+                  >
+                    <div className="flex items-center gap-2 w-full">
+                      <span className="h-1.5 w-1.5 rounded-full bg-yellow-400 shrink-0" />
+                      <span className="text-sm font-medium text-slate-900">{n.title}</span>
+                      <span className="ml-auto text-[11px] text-slate-400 shrink-0">{n.time}</span>
+                    </div>
+                    <p className="text-xs text-slate-500 ml-3.5">{n.body}</p>
+                  </Link>
+                </DropdownMenuItem>
+              ))}
+              <DropdownMenuSeparator />
+              <DropdownMenuItem asChild>
+                <Link href="/dashboard" className="justify-center text-xs text-slate-500 hover:text-slate-700 cursor-pointer py-2 flex">
+                  View dashboard
+                </Link>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
 
           {user ? (
             <DropdownMenu>

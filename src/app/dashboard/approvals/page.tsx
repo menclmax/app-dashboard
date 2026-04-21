@@ -81,7 +81,7 @@ export default function ApprovalsPage() {
   const pendingCount = pending.length
 
   return (
-    <main className="flex-1">
+    <main className="flex-1 overflow-y-auto">
       <Header title="Place Approvals" description="Review new coffee spots submitted by the community" />
       <div className="p-6 space-y-6">
 

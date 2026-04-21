@@ -134,7 +134,7 @@ export function UsersClient({ initialUsers }: { initialUsers: Profile[] }) {
   const unverifiedSelected = selectedUsers.filter((u) => !u.verified)
 
   return (
-    <main className="flex-1">
+    <main className="flex-1 overflow-y-auto">
       <Header title="User Management" />
       <div className="p-6 space-y-4">
 

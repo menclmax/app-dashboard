@@ -40,7 +40,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
 
   return (
     <UserProvider user={user}>
-      <div className="flex min-h-screen bg-slate-50 overflow-x-hidden">
+      <div className="flex h-screen overflow-hidden bg-slate-50">
         <Sidebar />
         <div className="flex-1 flex flex-col pl-64 min-w-0 max-w-full">
           {children}

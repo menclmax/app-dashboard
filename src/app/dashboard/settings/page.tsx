@@ -16,7 +16,7 @@ export default async function SettingsPage() {
     .single()
 
   return (
-    <main className="flex-1">
+    <main className="flex-1 overflow-y-auto">
       <Header title="Settings" description="Manage your admin profile" />
       <SettingsClient profile={profile} email={authUser.email ?? ''} />
     </main>
