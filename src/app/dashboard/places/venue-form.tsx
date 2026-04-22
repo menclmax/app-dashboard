@@ -13,6 +13,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { X, Upload, Loader2, CheckCircle2 } from "lucide-react"
+import { ImageCropDialog } from "./image-crop-dialog"
 
 const LocationPicker = dynamic(
   () => import("./location-picker").then((m) => m.LocationPicker),
@@ -85,6 +86,8 @@ export function VenueForm({ venue, mode, onSuccess, onCancel }: VenueFormProps) 
   const [sectionApprovals, setSectionApprovals] = useState<SectionApprovals>(
     (venue?.section_approvals as SectionApprovals) ?? {}
   )
+
+  const [logoCropSrc, setLogoCropSrc] = useState<string | null>(null)
 
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -403,9 +406,13 @@ export function VenueForm({ venue, mode, onSuccess, onCancel }: VenueFormProps) 
       {mode === "edit" && venue?.id && (
         <Card>
           <CardContent className="pt-6 space-y-4">
-            <SectionHeader label="Media" section="media" venueId={venueId} approvals={sectionApprovals} onToggle={handleSectionToggle} />
+            <h2 className="text-sm font-semibold text-slate-700 uppercase tracking-wide -mt-1">Media</h2>
             <div className="grid grid-cols-3 gap-3">
-              <PhotoSlot label="Logo" url={logoUrl} uploading={uploadingLogo} inputRef={logoInputRef} onPick={() => logoInputRef.current?.click()} onFile={(f) => handleUpload(f, "logo_url")} square />
+              <PhotoSlot label="Logo" url={logoUrl} uploading={uploadingLogo} inputRef={logoInputRef} onPick={() => logoInputRef.current?.click()} onFile={(f) => {
+                const reader = new FileReader()
+                reader.onload = () => setLogoCropSrc(reader.result as string)
+                reader.readAsDataURL(f)
+              }} square />
               <PhotoSlot label="Cover" url={coverPhotoUrl} uploading={uploadingCover} inputRef={coverInputRef} onPick={() => coverInputRef.current?.click()} onFile={(f) => handleUpload(f, "cover_photo_url")} />
               <PhotoSlot label="Photo" url={photoUrl} uploading={uploadingPhoto} inputRef={photoInputRef} onPick={() => photoInputRef.current?.click()} onFile={(f) => handleUpload(f, "photo_url")} />
             </div>
@@ -440,6 +447,19 @@ export function VenueForm({ venue, mode, onSuccess, onCancel }: VenueFormProps) 
           {saving || isPending ? <><Loader2 className="h-4 w-4 animate-spin" />Saving…</> : mode === "new" ? "Create venue" : "Save venue"}
         </Button>
       </div>
+      {logoCropSrc && (
+        <ImageCropDialog
+          src={logoCropSrc}
+          aspect={1}
+          title="Crop Logo"
+          onCancel={() => setLogoCropSrc(null)}
+          onDone={async (blob) => {
+            setLogoCropSrc(null)
+            const file = new File([blob], "logo.jpg", { type: "image/jpeg" })
+            await handleUpload(file, "logo_url")
+          }}
+        />
+      )}
     </form>
   )
 }

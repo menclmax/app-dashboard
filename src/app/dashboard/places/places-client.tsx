@@ -18,6 +18,7 @@ import {
   PanelRightClose, PanelRightOpen,
 } from "lucide-react"
 import { uploadVenuePhoto } from "@/app/actions/venues"
+import { ImageCropDialog } from "./image-crop-dialog"
 
 const VenuesMap = dynamic(
   () => import("./venues-map").then((m) => m.VenuesMap),
@@ -96,6 +97,7 @@ export function PlacesClient({ venues }: { venues: Venue[] }) {
   const pendingLogoVenueId = useRef<string | null>(null)
   const [uploadingLogoId, setUploadingLogoId] = useState<string | null>(null)
   const [logoOverrides, setLogoOverrides] = useState<Record<string, string>>({})
+  const [logoCrop, setLogoCrop] = useState<{ src: string; venueId: string } | null>(null)
 
   const total = venues.length
   const approved = venues.filter((v) => v.is_approved).length
@@ -156,14 +158,20 @@ export function PlacesClient({ venues }: { venues: Venue[] }) {
     { id: "seeded", label: "Seeded", count: seeded },
   ]
 
-  async function handleLogoFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+  function handleLogoFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     const venueId = pendingLogoVenueId.current
     e.target.value = ""
     if (!file || !venueId) return
+    const reader = new FileReader()
+    reader.onload = () => setLogoCrop({ src: reader.result as string, venueId })
+    reader.readAsDataURL(file)
+  }
+
+  async function uploadCroppedLogo(blob: Blob, venueId: string) {
     setUploadingLogoId(venueId)
     const fd = new FormData()
-    fd.append("file", file)
+    fd.append("file", new File([blob], "logo.jpg", { type: "image/jpeg" }))
     const result = await uploadVenuePhoto(venueId, fd, "logo_url")
     setUploadingLogoId(null)
     if ("url" in result) setLogoOverrides((prev) => ({ ...prev, [venueId]: result.url }))
@@ -183,6 +191,19 @@ export function PlacesClient({ venues }: { venues: Venue[] }) {
   return (
     <div className="flex flex-1 min-h-0 overflow-hidden">
       <input ref={logoInputRef} type="file" accept="image/*" className="hidden" onChange={handleLogoFileChange} />
+      {logoCrop && (
+        <ImageCropDialog
+          src={logoCrop.src}
+          aspect={1}
+          title="Crop Logo"
+          onCancel={() => setLogoCrop(null)}
+          onDone={(blob) => {
+            const venueId = logoCrop.venueId
+            setLogoCrop(null)
+            uploadCroppedLogo(blob, venueId)
+          }}
+        />
+      )}
 
       {/* ── Left: map + list ── */}
       <div className={`flex flex-col min-h-0 overflow-hidden transition-[width] duration-300 ease-in-out ${panelOpen ? "w-3/5" : "w-full"}`}>
